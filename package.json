@@ -10,6 +10,7 @@
     "test": "node --test tests/unit-suite.test.mjs tests/organization-search.test.mjs tests/contributor-readiness.test.mjs tests/application-milestones.test.mjs tests/proposal-sections.test.mjs",
     "audit": "npm audit && node scripts/audit-coverage.js",
     "db:indexes": "node scripts/setup-indexes.js",
+    "db:migrate-proposal-times": "node scripts/migrate-proposal-updated-at.js",
     "db:seed": "node scripts/seed-programs.js",
     "db:setup": "node scripts/setup-indexes.js && node scripts/seed-programs.js",
     "db:ingest": "node scripts/ingest-csv.js",
