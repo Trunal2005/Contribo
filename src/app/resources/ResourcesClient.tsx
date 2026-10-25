@@ -10,7 +10,11 @@ import {
   ShieldAlert,
   ChevronDown,
   ChevronUp,
-  Zap
+  Zap,
+  GitFork,
+  MessageSquareQuote,
+  GitPullRequest,
+  GitMerge
 } from 'lucide-react';
 
 interface ResourceGuide {
@@ -202,6 +206,59 @@ const RESOURCES: ResourceGuide[] = [
   }
 ];
 
+interface LifecycleStep {
+  step: string;
+  title: string;
+  description: string;
+  tags: string[];
+  icon: React.ElementType;
+}
+
+const LIFECYCLE_STEPS: LifecycleStep[] = [
+  {
+    step: '01',
+    title: 'Lurk & Explore',
+    description: 'Inspecting commit velocity, reviewing recent PR activity, and reading CONTRIBUTING.md to understand the workflow and community expectations.',
+    tags: ['Commit Velocity', 'CONTRIBUTING.md', 'Issue Triage'],
+    icon: Compass,
+  },
+  {
+    step: '02',
+    title: 'Fork & Setup',
+    description: 'Forking repo, setting upstream remote, installing dependencies, and running test suites locally to ensure a stable baseline.',
+    tags: ['Fork Repo', 'git remote add upstream', 'Local Setup'],
+    icon: GitFork,
+  },
+  {
+    step: '03',
+    title: 'Reproduce & Discuss',
+    description: 'Confirming the bug or proposing approach on the issue discussion before writing code. Wait for official assignment before starting.',
+    tags: ['Reproduce Bug', 'Discuss Approach', 'Wait for Assignment'],
+    icon: MessageSquareQuote,
+  },
+  {
+    step: '04',
+    title: 'Branch & Implement',
+    description: 'Creating a feature branch from main and writing atomic code with tests, adhering strictly to codebase conventions and standards.',
+    tags: ['Feature Branch', 'Atomic Commits', 'Type Safety'],
+    icon: GitBranch,
+  },
+  {
+    step: '05',
+    title: 'Open PR & Pass CI',
+    description: 'Submitting structured description referencing the issue, providing reproduction proof, and watching CI turns green.',
+    tags: ['Structured PR', 'Fixes #issue', 'Pass CI'],
+    icon: GitPullRequest,
+  },
+  {
+    step: '06',
+    title: 'Review & Merge',
+    description: 'Iterating constructively on maintainer review feedback, rebasing or squashing commits, and celebrating the merged milestone.',
+    tags: ['Address Feedback', 'Rebase / Squash', 'Merged Milestone 🎉'],
+    icon: GitMerge,
+  },
+];
+
 function ResourceCard({ guide }: { guide: ResourceGuide }) {
   const [expanded, setExpanded] = useState(false);
   const Icon = guide.icon;
@@ -274,6 +331,71 @@ export function ResourcesClient() {
           Level up your open-source journey. Explore our curated guides packed with <strong className="text-primary">real-life examples</strong> from successful past contributors.
         </p>
       </div>
+
+      {/* Contributor Lifecycle */}
+      <section>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mb-8">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-8 w-1.5 bg-accent rounded-full" />
+              <h2 className="text-2xl font-bold text-primary">Contributor Lifecycle</h2>
+            </div>
+            <p className="text-sm text-secondary max-w-2xl">
+              The 6-step path every open-source contributor takes from zero to a merged PR.
+            </p>
+          </div>
+          <span className="text-xs font-mono text-tertiary uppercase tracking-wider self-start sm:self-end">
+            Roadmap · 6 Steps
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {LIFECYCLE_STEPS.map((step) => {
+            const Icon = step.icon;
+            return (
+              <div
+                key={step.step}
+                className="group relative flex flex-col bg-surface border border-hairline rounded-2xl p-6 transition-all duration-300 hover:border-accent/40 hover:shadow-md hover:-translate-y-0.5 overflow-hidden"
+              >
+                {/* Top Accent Line */}
+                <div className="absolute top-0 left-0 right-0 h-[3px] bg-accent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+
+                {/* Header: Step Number Pill & Icon */}
+                <div className="flex items-center justify-between mb-4">
+                  <span className="font-mono text-xs font-bold text-accent bg-accent/10 border border-accent/20 px-2.5 py-1 rounded-md">
+                    STEP {step.step}
+                  </span>
+                  <div className="p-2.5 rounded-xl bg-surface-raised border border-hairline text-primary group-hover:text-accent group-hover:bg-accent/10 transition-colors">
+                    <Icon size={20} />
+                  </div>
+                </div>
+
+                {/* Title */}
+                <h3 className="text-lg font-bold text-primary mb-2 group-hover:text-accent transition-colors">
+                  {step.title}
+                </h3>
+
+                {/* Description */}
+                <p className="text-sm text-secondary leading-relaxed mb-4 flex-1">
+                  {step.description}
+                </p>
+
+                {/* Action Tags */}
+                <div className="flex flex-wrap gap-1.5 pt-3 border-t border-hairline/60 mt-auto">
+                  {step.tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-[11px] font-mono text-tertiary bg-surface-raised px-2 py-0.5 rounded border border-hairline/60"
+                    >
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
 
       {/* Resources to level up */}
       <section>
