@@ -69,7 +69,9 @@ export async function listProjects(query: ProjectListQuery) {
   }
 
   if (query.tech && query.tech !== 'all') {
-    filter.techStack = { $regex: new RegExp(`^${escapeRegex(query.tech)}$`, 'i') };
+    const tag = { $regex: new RegExp(`^${escapeRegex(query.tech)}$`, 'i') };
+    // Keep tag selection separate from the text-search fallback's $or.
+    filter.$and = [{ $or: [{ techStack: tag }, { topics: tag }] }];
   }
 
   if (query.year) {

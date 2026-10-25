@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test tests/unit-suite.test.mjs tests/organization-search.test.mjs tests/contributor-readiness.test.mjs tests/application-milestones.test.mjs tests/proposal-sections.test.mjs",
+    "test": "node --test tests/unit-suite.test.mjs tests/organization-search.test.mjs tests/contributor-readiness.test.mjs tests/application-milestones.test.mjs tests/proposal-sections.test.mjs tests/hacktoberfest.test.mjs",
     "audit": "npm audit && node scripts/audit-coverage.js",
     "db:indexes": "node scripts/setup-indexes.js",
     "db:seed": "node scripts/seed-programs.js",
@@ -19,7 +19,8 @@
     "db:sync-outreachy": "node scripts/sync-outreachy.js",
     "db:upgrade": "node scripts/upgrade-db-cluster.js",
     "postman:sync": "node scripts/update-postman-env.js",
-    "smoke": "node scripts/smoke-api.js"
+    "smoke": "node scripts/smoke-api.js",
+    "db:sync-hacktoberfest": "node scripts/sync-hacktoberfest.js"
   },
   "dependencies": {
     "@auth/mongodb-adapter": "^3.11.2",

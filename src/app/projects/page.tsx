@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import hacktoberfestTags from '@/lib/hacktoberfest-tags.json';
 import Script from 'next/script';
 import { Project } from '../../../types';
 import { ProjectCard } from '@/components/ui/ProjectCard';
@@ -84,7 +85,7 @@ async function getProjectsData(options: {
       name: p.name as string,
       slug: p.slug as string,
     })),
-    technologies: techFromDb.length > 0 ? techFromDb : FALLBACK_TECH,
+    technologies: [...new Set([...(techFromDb.length > 0 ? techFromDb : FALLBACK_TECH), ...hacktoberfestTags])],
     difficulties:
       facets.difficulties?.length > 0
         ? facets.difficulties
@@ -286,7 +287,7 @@ export default async function ProjectsDirectory({ searchParams }: Props) {
 
             {/* Tech Tags Cloud — live facets from /api/meta/filters */}
             <div className="space-y-3 pt-4 border-t border-hairline/60">
-              <label className="text-xs font-mono uppercase tracking-wider text-muted font-bold block">Popular Stacks</label>
+              <label className="text-xs font-mono uppercase tracking-wider text-muted font-bold block">Stacks & Hacktoberfest Tracks</label>
               <div className="flex flex-wrap gap-1.5">
                 {technologies.map(t => {
                   const isActive = tech?.toLowerCase() === t.toLowerCase();
