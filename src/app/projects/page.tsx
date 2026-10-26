@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { redirect } from 'next/navigation';
+import { parsePage } from '@/lib/pagination';
 import hacktoberfestTags from '@/lib/hacktoberfest-tags.json';
 import Script from 'next/script';
 import { Project } from '../../../types';
