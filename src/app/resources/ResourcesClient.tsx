@@ -258,6 +258,46 @@ function ResourceCard({ guide }: { guide: ResourceGuide }) {
   );
 }
 
+// Sections on this page that can be jumped to. Add an entry here (and an
+// id on the section) when a new section such as the PR Lab, lifecycle,
+// toolkit or glossary lands, so no pill ever points at a missing section.
+const QUICK_LINKS = [
+  { id: 'guides', label: 'Guides' },
+  { id: 'all-resources', label: 'All resources' },
+];
+
+function QuickJump() {
+  const jump = (e: React.MouseEvent<HTMLAnchorElement>, id: string) => {
+    const target = document.getElementById(id);
+    if (!target) return;
+    e.preventDefault();
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    target.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    window.history.replaceState(null, '', `#${id}`);
+  };
+
+  return (
+    <nav
+      aria-label="Jump to a section"
+      className="sticky top-20 z-30 mx-auto w-fit max-w-full rounded-full border border-hairline bg-surface/85 p-1.5 shadow-sm backdrop-blur-md"
+    >
+      <ul className="flex items-center gap-1 overflow-x-auto no-scrollbar">
+        {QUICK_LINKS.map(l => (
+          <li key={l.id} className="shrink-0">
+            <a
+              href={`#${l.id}`}
+              onClick={e => jump(e, l.id)}
+              className="block rounded-full px-4 py-1.5 text-sm font-medium text-secondary transition-colors hover:bg-surface-raised hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              {l.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  );
+}
+
 export function ResourcesClient() {
   const highlights = RESOURCES.filter(r => r.isHighlight);
   const others = RESOURCES.filter(r => !r.isHighlight);
@@ -275,8 +315,10 @@ export function ResourcesClient() {
         </p>
       </div>
 
+      <QuickJump />
+
       {/* Resources to level up */}
-      <section>
+      <section id="guides" className="scroll-mt-40">
         <div className="flex items-center gap-3 mb-8">
           <div className="h-8 w-1.5 bg-accent rounded-full" />
           <h2 className="text-2xl font-bold text-primary">Resources to level up</h2>
@@ -289,7 +331,7 @@ export function ResourcesClient() {
       </section>
 
       {/* All Resources */}
-      <section>
+      <section id="all-resources" className="scroll-mt-40">
         <div className="flex items-center gap-3 mb-8">
           <div className="h-8 w-1.5 bg-tertiary rounded-full" />
           <h2 className="text-2xl font-bold text-primary">All resources</h2>
