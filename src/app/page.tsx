@@ -12,7 +12,7 @@ import { Hero } from '@/components/hero/Hero';
 import { ScrollReveal } from '@/components/ui/ScrollReveal';
 import { auth } from '@/auth';
 import { getUserItemStatus } from '@/lib/repositories/dashboard';
-import { getCachedHomeBundle, getCachedPrograms } from '@/lib/data-cache';
+import { getCachedHomeBundle, getCachedPrograms, getCachedFeaturedOrganizations } from '@/lib/data-cache';
 import {
   DeferredHeroStats,
   DeferredProposalStudioSection,
@@ -37,12 +37,18 @@ const FALLBACK_IMAGE =
   'https://images.unsplash.com/photo-1558494949-ef010cbdcc31?auto=format&fit=crop&w=800&q=80';
 
 export default async function Home() {
-  // Parallel fetch: catalog + session + programs (cached)
-  const [{ stats, trending }, session, allProgramsRaw] = await Promise.all([
+  // Parallel fetch: catalog + session + programs + org showcase (cached)
+  const [{ stats, trending }, session, allProgramsRaw, featuredOrgs] = await Promise.all([
     getCachedHomeBundle(),
     auth(),
     getCachedPrograms(),
+    getCachedFeaturedOrganizations(),
   ]);
+
+  // One organization total for the whole page. estimatedDocumentCount (what the
+  // stats band uses) and a real count can disagree; the directory quote below
+  // is exact, so every mention of the number derives from it.
+  const orgTotal = featuredOrgs.total;
 
   let savedProjects: string[] = [];
   let trackedProjects: string[] = [];
@@ -214,7 +220,7 @@ export default async function Home() {
 
 
         {/* LIVE STATS */}
-        <DeferredHeroStats stats={stats} />
+        <DeferredHeroStats stats={{ ...stats, orgs: orgTotal }} />
 
         {/* HOW IT WORKS */}
         <ScrollReveal animation="slide-up">
@@ -306,6 +312,7 @@ export default async function Home() {
           projects={trending}
           savedProjects={savedProjects}
           trackedProjects={trackedProjects}
+          projectTotal={stats?.projects}
         />
 
         {/* YEAR TIMELINE — deferred */}
@@ -341,16 +348,16 @@ export default async function Home() {
               href="/organizations"
               className="inline-flex items-center gap-1.5 h-10 px-4 rounded-xl border border-hairline bg-surface hover:bg-surface-raised text-primary text-xs sm:text-sm font-semibold transition-all shrink-0 self-start sm:self-auto"
             >
-              Browse all 1,250+
+              {orgTotal > 0 ? `Browse all ${orgTotal.toLocaleString()}` : 'Browse all'}
               <ArrowRight size={14} />
             </Link>
           </div>
-          <DeferredPopularOrgs />
+          <DeferredPopularOrgs organizations={featuredOrgs.organizations} total={orgTotal} />
         </section>
 
         {/* ROADMAP — Bento Grid UI */}
         <ScrollReveal animation="slide-up">
-          <ContributorRoadmapBento />
+          <ContributorRoadmapBento organizationCount={orgTotal} />
         </ScrollReveal>
 
         {/* RESOURCES — static */}

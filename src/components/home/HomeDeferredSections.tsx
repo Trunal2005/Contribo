@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import { LazySection } from '@/components/ui/LazySection';
 import { SectionSkeleton } from '@/components/ui/SectionSkeleton';
 import type { TrendingProject } from '@/components/home/TrendingProjects';
+import type { FeaturedOrganization } from '@/lib/repositories/organizations';
 
 /**
  * Client-only deferred home sections.
@@ -100,10 +101,12 @@ export function DeferredTrendingProjects({
   projects,
   savedProjects,
   trackedProjects,
+  projectTotal,
 }: {
   projects: TrendingProject[];
   savedProjects: string[];
   trackedProjects: string[];
+  projectTotal?: number;
 }) {
   return (
     <LazySection
@@ -115,6 +118,7 @@ export function DeferredTrendingProjects({
         projects={projects}
         savedProjects={savedProjects}
         trackedProjects={trackedProjects}
+        projectTotal={projectTotal}
       />
     </LazySection>
   );
@@ -128,10 +132,16 @@ export function DeferredProgramTimeline({ initialMonthIndex }: { initialMonthInd
   );
 }
 
-export function DeferredPopularOrgs() {
+export function DeferredPopularOrgs({
+  organizations,
+  total,
+}: {
+  organizations: FeaturedOrganization[];
+  total: number;
+}) {
   return (
     <LazySection fallback={<SectionSkeleton variant="grid" count={8} />} minHeight={160}>
-      <PopularOrgsGrid />
+      <PopularOrgsGrid organizations={organizations} total={total} />
     </LazySection>
   );
 }

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { scryptSync, randomBytes, timingSafeEqual } from 'crypto';
 import { ObjectId } from 'mongodb';
 
@@ -557,3 +558,128 @@ test('9. OAuth Provider Configuration Detection', async (t) => {
 });
 
 
+
+// ==========================================
+// 11. Home Page Organization Showcase: Real Counts, Real Links
+//     Mirrors programShortLabel() and rankOrganizationsByProjectCount() in
+//     src/lib/repositories/organizations.ts plus the marquee/tile rules in
+//     src/components/ui/OrgMarquee.tsx and src/components/hero/HeroStats.tsx.
+// ==========================================
+const PROGRAM_SHORT_LABELS = {
+  gsoc: 'GSoC',
+  outreachy: 'Outreachy',
+  lfx: 'LFX',
+  hacktoberfest: 'Hacktoberfest',
+  'summer-of-bitcoin': 'Summer of Bitcoin',
+  'mlh-fellowship': 'MLH',
+  gssoc: 'GSSoC',
+  nsoc: 'NSoC',
+  esoc: 'ESoC',
+};
+
+function programShortLabel(program) {
+  if (!program) return null;
+  const slug = typeof program.slug === 'string' ? program.slug.trim().toLowerCase() : '';
+  if (slug && PROGRAM_SHORT_LABELS[slug]) return PROGRAM_SHORT_LABELS[slug];
+  const name = typeof program.name === 'string' ? program.name.trim() : '';
+  return name || null;
+}
+
+function rankOrganizationsByProjectCount(orgs) {
+  return [...orgs].sort(
+    (a, b) => b.projectCount - a.projectCount || a.name.localeCompare(b.name)
+  );
+}
+
+function marqueeLogos(organizations, { limit = 12 } = {}) {
+  const logos = [];
+  const seen = new Set();
+  for (const org of organizations) {
+    const slug = typeof org?.slug === 'string' ? org.slug.trim() : '';
+    const name = typeof org?.name === 'string' ? org.name.trim() : '';
+    if (!slug || !name || seen.has(slug)) continue;
+    seen.add(slug);
+    logos.push({ name, slug });
+    if (logos.length >= limit) break;
+  }
+  return logos;
+}
+
+function statValue(value) {
+  return typeof value === 'number' && Number.isFinite(value) ? value.toLocaleString() : '—';
+}
+
+test('11. Home Page Organization Showcase Truthfulness', async (t) => {
+  await t.test('ranks the showcase by projects actually in the catalog', () => {
+    const ranked = rankOrganizationsByProjectCount([
+      { name: 'Zeta', projectCount: 3 },
+      { name: 'Alpha', projectCount: 40 },
+      { name: 'Beta', projectCount: 40 },
+      { name: 'Gamma', projectCount: 0 },
+    ]);
+    assert.deepEqual(ranked.map((o) => o.name), ['Alpha', 'Beta', 'Zeta', 'Gamma']);
+  });
+
+  await t.test('program pills use the slug, then the real name, never a guess', () => {
+    assert.equal(programShortLabel({ slug: 'gsoc', name: 'Google Summer of Code 2026' }), 'GSoC');
+    assert.equal(programShortLabel({ slug: 'LFX' }), 'LFX');
+    assert.equal(
+      programShortLabel({ slug: 'winter-of-code', name: 'Winter of Code' }),
+      'Winter of Code'
+    );
+    assert.equal(programShortLabel({ slug: 'winter-of-code', name: '   ' }), null);
+    assert.equal(programShortLabel(undefined), null);
+  });
+
+  await t.test('marquee tiles deduplicate by slug so no two link to one page', () => {
+    // The regression this guards: "Linux Foundation" and "CNCF" both carried
+    // slug 'cncf', so the strip showed two tiles for one detail page.
+    const logos = marqueeLogos([
+      { name: 'Linux Foundation', slug: 'cncf' },
+      { name: 'CNCF', slug: 'cncf' },
+      { name: 'Apache', slug: 'apache-software-foundation' },
+      { name: 'No Slug Org', slug: '  ' },
+      { name: '', slug: 'blank-name' },
+    ]);
+    assert.deepEqual(logos, [
+      { name: 'Linux Foundation', slug: 'cncf' },
+      { name: 'Apache', slug: 'apache-software-foundation' },
+    ]);
+  });
+
+  await t.test('stats tiles show a dash rather than an invented number', () => {
+    assert.equal(statValue(639), '639');
+    assert.equal(statValue(12500), '12,500');
+    assert.equal(statValue(0), '0');
+    assert.equal(statValue(undefined), '—');
+    assert.equal(statValue('639'), '—');
+    assert.equal(statValue(Number.NaN), '—');
+  });
+
+  await t.test('the home page source contains no unsourced headline numbers', () => {
+    const read = (rel) => readFileSync(new URL(rel, import.meta.url), 'utf8');
+    const forbidden = [
+      ['../src/components/hero/HeroStats.tsx', ['50K+', '95%', "'12,115'", "'639'"]],
+      ['../src/components/ui/PopularOrgsGrid.tsx', ['1,250', '1.2k', 'ROW_1_ORGS', 'ROW_2_ORGS', '+ Projects']],
+      ['../src/components/ui/OrgMarquee.tsx', ['DEFAULT_MARQUEE_LOGOS', "slug: 'cncf'"]],
+      ['../src/components/home/ContributorRoadmapBento.tsx', ['1,250+']],
+      ['../src/components/home/TrendingProjects.tsx', ['13.4k']],
+      ['../src/app/page.tsx', ['Browse all 1,250+']],
+    ];
+
+    for (const [rel, needles] of forbidden) {
+      const source = read(rel);
+      for (const needle of needles) {
+        assert.ok(
+          !source.includes(needle),
+          `${rel} must not contain the unsourced literal ${JSON.stringify(needle)}`
+        );
+      }
+    }
+
+    // Positive half of the same check: the showcase is prop-driven.
+    const grid = read('../src/components/ui/PopularOrgsGrid.tsx');
+    assert.ok(grid.includes('organizations: FeaturedOrganization[]'));
+    assert.ok(grid.includes('/organizations/${org.slug}'));
+  });
+});
