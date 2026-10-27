@@ -12,6 +12,7 @@ import {
   ChevronUp,
   Zap
 } from 'lucide-react';
+import { OpenSourceGlossary } from './components/OpenSourceGlossary';
 
 interface ResourceGuide {
   id: string;
@@ -342,6 +343,8 @@ export function ResourcesClient() {
           ))}
         </div>
       </section>
+
+      <OpenSourceGlossary />
 
     </div>
   );
