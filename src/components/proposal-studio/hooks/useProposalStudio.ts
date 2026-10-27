@@ -300,7 +300,7 @@ export function useProposalStudio() {
                 ...d,
                 sections: updated,
                 progress,
-                updatedAt: 'Just now',
+                updatedAt: new Date().toISOString(),
               }
             : d
         );
@@ -385,7 +385,7 @@ export function useProposalStudio() {
       setDrafts((prevDrafts) =>
         prevDrafts.map((d) =>
           d.id === activeDraftId
-            ? { ...d, sections: updated, progress, updatedAt: 'Just now' }
+            ? { ...d, sections: updated, progress, updatedAt: new Date().toISOString() }
             : d
         )
       );
@@ -418,7 +418,8 @@ export function useProposalStudio() {
         difficulty: 'Intermediate',
         acceptedExamplesCount: 4,
         communityContributionsCount: 2,
-        updatedAt: 'Just now',
+        updatedAt: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
         sections: {
           summary: proposal.summary,
           problemStatement: `Based on accepted proposal structure:\n${proposal.summary}`,

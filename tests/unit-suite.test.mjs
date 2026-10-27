@@ -557,6 +557,153 @@ test('9. OAuth Provider Configuration Detection', async (t) => {
   });
 });
 
+// ==========================================
+// 10. Draft Timestamps: Parsing, Ageing Labels, Recency Ordering
+//     Mirrors src/lib/time.ts and updatedAtOf() in
+//     src/lib/repositories/proposals.ts (this suite stays dependency-free,
+//     consistent with sections 1-9).
+// ==========================================
+const ISO_LIKE = /^\d{4}-\d{2}-\d{2}([T ]\d{2}:\d{2}(:\d{2}(\.\d{1,9})?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
+function toDate(value) {
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const fromNumber = new Date(value);
+    return Number.isNaN(fromNumber.getTime()) ? null : fromNumber;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed || !ISO_LIKE.test(trimmed)) return null;
+    const parsed = new Date(trimmed);
+    return Number.isNaN(parsed.getTime()) ? null : parsed;
+  }
+  return null;
+}
+
+const MINUTE_MS = 60_000;
+const HOUR_MS = 60 * MINUTE_MS;
+const DAY_MS = 24 * HOUR_MS;
+
+function plural(count, unit) {
+  return `${count} ${unit}${count === 1 ? '' : 's'}`;
+}
+
+function formatRelativeTime(value, now = new Date()) {
+  const date = toDate(value);
+  if (!date) return null;
+  const elapsed = Math.max(0, now.getTime() - date.getTime());
+  if (elapsed < MINUTE_MS) return 'just now';
+  if (elapsed < HOUR_MS) return `${plural(Math.floor(elapsed / MINUTE_MS), 'minute')} ago`;
+  if (elapsed < DAY_MS) return `${plural(Math.floor(elapsed / HOUR_MS), 'hour')} ago`;
+  const days = Math.floor(elapsed / DAY_MS);
+  if (days === 1) return 'yesterday';
+  if (days < 7) return `${plural(days, 'day')} ago`;
+  return date.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+}
+
+function updatedAtOrCreated(draft) {
+  return toDate(draft.updatedAt) ?? toDate(draft.createdAt);
+}
+
+/** Same resolution order as the repository: updatedAt → createdAt → _id clock. */
+function updatedAtOf(doc) {
+  const known = updatedAtOrCreated(doc);
+  if (known) return known;
+  if (doc._id instanceof ObjectId) return doc._id.getTimestamp();
+  if (typeof doc._id === 'string' && ObjectId.isValid(doc._id)) {
+    return new ObjectId(doc._id).getTimestamp();
+  }
+  return null;
+}
+
+function sortNewestFirst(items) {
+  const time = (item) => updatedAtOf(item)?.getTime() ?? Number.MIN_SAFE_INTEGER;
+  return [...items].sort((a, b) => time(b) - time(a));
+}
+
+test('10. Draft Timestamps & Recently-Edited Ordering', async (t) => {
+  await t.test('rejects prose so it can never win an alphabetical sort', () => {
+    assert.equal(toDate('Just now'), null);
+    assert.equal(toDate('Yesterday'), null);
+    assert.equal(toDate('2 hours ago'), null);
+    assert.equal(toDate(''), null);
+    assert.equal(toDate('   '), null);
+    assert.equal(toDate(null), null);
+    assert.equal(toDate(undefined), null);
+    assert.equal(toDate({}), null);
+    assert.equal(toDate(new Date('nope')), null);
+  });
+
+  await t.test('accepts every shape a draft can actually arrive in', () => {
+    const exact = new Date('2026-04-13T09:30:00.000Z');
+    assert.equal(toDate(exact).getTime(), exact.getTime());
+    assert.equal(toDate('2026-04-13T09:30:00.000Z').getTime(), exact.getTime());
+    assert.equal(toDate('2026-04-13T09:30:00Z').getTime(), exact.getTime());
+    assert.equal(toDate('2026-04-13').getTime(), new Date('2026-04-13T00:00:00.000Z').getTime());
+    assert.equal(toDate(exact.getTime()).getTime(), exact.getTime());
+  });
+
+  await t.test('labels age instead of freezing on "Just now"', () => {
+    const now = new Date('2026-04-13T12:00:00.000Z');
+    assert.equal(formatRelativeTime(new Date(now.getTime() - 40_000), now), 'just now');
+    assert.equal(formatRelativeTime(new Date(now.getTime() - MINUTE_MS), now), '1 minute ago');
+    assert.equal(formatRelativeTime(new Date(now.getTime() - 5 * MINUTE_MS), now), '5 minutes ago');
+    assert.equal(formatRelativeTime(new Date(now.getTime() - HOUR_MS), now), '1 hour ago');
+    assert.equal(formatRelativeTime(new Date(now.getTime() - 2 * HOUR_MS), now), '2 hours ago');
+    assert.equal(formatRelativeTime(new Date(now.getTime() - 26 * HOUR_MS), now), 'yesterday');
+    assert.equal(formatRelativeTime(new Date(now.getTime() - 4 * DAY_MS), now), '4 days ago');
+    assert.equal(formatRelativeTime('Just now', now), null);
+  });
+
+  await t.test('treats a future timestamp as just now instead of going negative', () => {
+    const now = new Date('2026-04-13T12:00:00.000Z');
+    assert.equal(formatRelativeTime(new Date(now.getTime() + 10 * MINUTE_MS), now), 'just now');
+  });
+
+  await t.test('orders drafts by real recency, not by spelling', () => {
+    const now = new Date('2026-04-13T12:00:00.000Z');
+    const drafts = [
+      { id: 'lexicographic-yesterday', updatedAt: 'Yesterday' },
+      { id: 'lexicographic-just-now', updatedAt: 'Just now' },
+      { id: 'oldest', updatedAt: new Date(now.getTime() - 30 * DAY_MS) },
+      { id: 'newest', updatedAt: new Date(now.getTime() - 60_000) },
+      { id: 'middle', updatedAt: new Date(now.getTime() - 3 * DAY_MS) },
+    ];
+
+    const ordered = sortNewestFirst(drafts).map((d) => d.id);
+    assert.deepEqual(ordered.slice(0, 3), ['newest', 'middle', 'oldest']);
+    // Prose rows fall below every real timestamp instead of jumping the queue.
+    assert.deepEqual(
+      new Set(ordered.slice(3)),
+      new Set(['lexicographic-yesterday', 'lexicographic-just-now'])
+    );
+  });
+
+  await t.test('falls back to createdAt, then to the ObjectId clock, never to "now"', () => {
+    const created = new Date('2026-03-01T00:00:00.000Z');
+    assert.equal(
+      updatedAtOf({ updatedAt: 'Just now', createdAt: created.toISOString() }).getTime(),
+      created.getTime()
+    );
+
+    // 0x507f1f77 is the seconds-precision clock packed into the front of this id:
+    // 2012-10-17T21:13:27.000Z.
+    const legacy = { updatedAt: 'Yesterday', _id: new ObjectId('507f1f77bcf86cd799439011') };
+    assert.equal(updatedAtOf(legacy).getTime(), 0x507f1f77 * 1000);
+    assert.equal(updatedAtOf(legacy).toISOString(), '2012-10-17T21:13:27.000Z');
+
+    assert.equal(updatedAtOf({ updatedAt: 'Just now' }), null);
+  });
+
+  await t.test('write path stores a Date so the Mongo sort is a recency sort', () => {
+    const stored = JSON.parse(
+      JSON.stringify({ updatedAt: new Date('2026-04-13T09:30:00.000Z') })
+    );
+    assert.equal(typeof stored.updatedAt, 'string');
+    assert.equal(toDate(stored.updatedAt).toISOString(), '2026-04-13T09:30:00.000Z');
+  });
+});
+
 
 
 // ==========================================
