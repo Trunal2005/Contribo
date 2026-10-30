@@ -1,6 +1,7 @@
 import { COLLECTIONS, getCollection } from '@/lib/db';
 import { improveProposalSectionWithGemini } from '@/lib/ai/gemini';
 import { toObjectId } from '@/lib/serialize';
+import { sortNewestFirst, updatedAtOrCreated } from '@/lib/time';
 import { PROPOSAL_SECTION_IDS, calculateProposalProgress } from '@/lib/proposal-studio/sections';
 import {
   DRAFT_PROPOSALS,
@@ -30,6 +31,24 @@ function proposalIdFilter(id: string) {
   return { $or: clauses };
 }
 
+/**
+ * Modification time of a draft, tolerating rows written before `updatedAt` held
+ * a real date. Preference order: the stored timestamp, the creation time, the
+ * clock inside the Mongo `_id`, and finally nothing — an unresolvable row must
+ * sink to the bottom of a "recently edited" list rather than win it by spelling.
+ */
+function updatedAtOf(draft: {
+  updatedAt?: unknown;
+  createdAt?: unknown;
+  _id?: unknown;
+}): Date | null {
+  const known = updatedAtOrCreated(draft);
+  if (known) return known;
+
+  const oid = toObjectId(draft._id as never);
+  return oid ? oid.getTimestamp() : null;
+}
+
 const ALLOWED_SECTION_IDS = new Set<string>([
   ...PROPOSAL_SECTION_IDS,
   // Keep legacy proposal content readable and editable.
@@ -52,6 +71,7 @@ function normalizeDraft(doc: ProposalDraft & { _id?: unknown; userId?: string })
     ...doc,
     id: doc.id || String(doc._id ?? ''),
     userId: doc.userId,
+    updatedAt: updatedAtOf(doc),
   } as ProposalDraft & { userId?: string };
 }
 
@@ -61,7 +81,10 @@ function ownsDraft(draft: ProposalDraft & { userId?: string }, userId: string) {
 }
 
 function memoryForUser(userId: string): ProposalDraft[] {
-  return memoryDrafts.filter((d) => ownsDraft(d as ProposalDraft & { userId?: string }, userId));
+  return sortNewestFirst(
+    memoryDrafts.filter((d) => ownsDraft(d as ProposalDraft & { userId?: string }, userId)),
+    updatedAtOf
+  );
 }
 
 /** List proposals for a single authenticated user only. Never returns unscoped data. */
@@ -76,7 +99,12 @@ export async function listUserProposals(userId: string): Promise<ProposalDraft[]
       .limit(100)
       .toArray();
     if (docs.length > 0) {
-      return docs.map((d) => normalizeDraft(d as ProposalDraft & { _id?: unknown }));
+      // Mongo orders real dates correctly; this pass only rescues legacy rows
+      // whose `updatedAt` is still prose, so they land on their creation time.
+      return sortNewestFirst(
+        docs.map((d) => normalizeDraft(d as ProposalDraft & { _id?: unknown })),
+        updatedAtOf
+      );
     }
     // Empty DB for this user — also check memory (created while offline)
     return memoryForUser(userId);
@@ -142,9 +170,9 @@ export async function createProposal(data: {
     : ['TypeScript', 'Python', 'React'];
 
   const newId = `draft-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const nowIso = new Date().toISOString();
+  const now = new Date();
 
-  const newDraft: ProposalDraft & { userId: string; createdAt: string } = {
+  const newDraft: ProposalDraft & { userId: string; createdAt: Date } = {
     id: newId,
     userId: data.userId,
     projectTitle,
@@ -166,8 +194,8 @@ export async function createProposal(data: {
     difficulty: 'Intermediate',
     acceptedExamplesCount: 3,
     communityContributionsCount: 1,
-    updatedAt: 'Just now',
-    createdAt: nowIso,
+    updatedAt: now,
+    createdAt: now,
     sections: Object.fromEntries([...ALLOWED_SECTION_IDS].map((id) => [id, ''])),
   };
 
@@ -196,7 +224,7 @@ export async function updateProposal(
   const existing = await getProposalById(id, userId);
   if (!existing) return null;
 
-  const updatedAt = 'Just now';
+  const updatedAt = new Date();
   let mergedSections = existing.sections;
   if (updates.sections && typeof updates.sections === 'object') {
     const next: Record<string, string> = { ...existing.sections };
