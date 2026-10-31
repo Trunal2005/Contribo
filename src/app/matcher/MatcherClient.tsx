@@ -26,7 +26,10 @@ import { OrgLogo } from '@/components/ui/OrgLogo';
 import { OrgProjectBarChart } from '@/components/ui/OrgProjectBarChart';
 import { friendlyApiMessage, isApiError, runMatcher, type MatchResult } from '@/lib/client/api';
 
+import hacktoberfestTags from '@/lib/hacktoberfest-tags.json';
+
 const SKILL_CATEGORIES = [
+  { name: 'Hacktoberfest Tracks', skills: hacktoberfestTags },
   {
     name: 'Languages',
     skills: [
